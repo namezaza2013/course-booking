@@ -1,0 +1,860 @@
+<!doctype html>
+<html lang="th">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>จองคอร์สเรียน — SPC Academy</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: { thai: ["'Sarabun'", "sans-serif"] },
+            colors: {
+              brand: { DEFAULT: "#6C3FC9", light: "#EDE9FF", dark: "#4B2BA3" },
+              accent: { DEFAULT: "#F9A826", light: "#FFF3D6" },
+            },
+          },
+        },
+      };
+    </script>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      body {
+        font-family: "Sarabun", sans-serif;
+      }
+      .day-btn:disabled {
+        opacity: 0.25;
+        cursor: not-allowed;
+      }
+      .day-btn:not(:disabled):hover {
+        background: #ede9ff;
+        color: #6c3fc9;
+      }
+      .booking-badge {
+        font-size: 0.5rem;
+        background: #f9a826;
+        color: #fff;
+        border-radius: 9999px;
+        padding: 0 4px;
+        line-height: 1.6;
+        min-width: 14px;
+        text-align: center;
+        font-weight: 700;
+      }
+      .day-btn.selected {
+        background: #6c3fc9 !important;
+        color: #fff !important;
+      }
+      .day-btn.today-mark {
+        border: 2px solid #f9a826;
+      }
+      .glass {
+        background: rgba(255, 255, 255, 0.85);
+        backdrop-filter: blur(14px);
+        -webkit-backdrop-filter: blur(14px);
+      }
+      input:focus,
+      select:focus {
+        outline: none;
+        box-shadow: 0 0 0 3px rgba(108, 63, 201, 0.25);
+      }
+      .fade-in {
+        animation: fadeIn 0.4s ease both;
+      }
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
+          transform: translateY(12px);
+        }
+        to {
+          opacity: 1;
+          transform: none;
+        }
+      }
+      .toast {
+        position: fixed;
+        bottom: 1.5rem;
+        right: 1.5rem;
+        z-index: 9999;
+        transition: all 0.4s;
+        transform: translateY(0);
+        opacity: 1;
+      }
+      .toast.hide {
+        transform: translateY(30px);
+        opacity: 0;
+      }
+      /* ── Loading spinner ── */
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+      .spinner {
+        width: 28px;
+        height: 28px;
+        border: 3px solid #ede9ff;
+        border-top-color: #6c3fc9;
+        border-radius: 50%;
+        animation: spin 0.7s linear infinite;
+        display: inline-block;
+      }
+      .loading-overlay {
+        position: absolute;
+        inset: 0;
+        background: rgba(255, 255, 255, 0.75);
+        backdrop-filter: blur(3px);
+        border-radius: 0.75rem;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+        z-index: 10;
+        transition: opacity 0.25s;
+      }
+      .loading-overlay.hide {
+        opacity: 0;
+        pointer-events: none;
+      }
+      .skeleton {
+        background: linear-gradient(
+          90deg,
+          #ede9ff 25%,
+          #d8d0f7 50%,
+          #ede9ff 75%
+        );
+        background-size: 200% 100%;
+        animation: shimmer 1.2s infinite;
+        border-radius: 0.75rem;
+        height: 2.4rem;
+      }
+      @keyframes shimmer {
+        to {
+          background-position: -200% 0;
+        }
+      }
+    </style>
+  </head>
+  <body
+    class="min-h-screen bg-gradient-to-br from-brand-light via-white to-accent-light"
+  >
+    <!-- ─── HEADER ─── -->
+    <header class="bg-brand shadow-lg">
+      <div class="max-w-5xl mx-auto px-4 py-4 flex items-center gap-3">
+        <div
+          class="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center text-white text-xl"
+        >
+          🤸
+        </div>
+        <div>
+          <h1 class="text-white font-bold text-xl leading-tight">Academy</h1>
+          <p class="text-white/70 text-xs">จองคอร์สเรียน ปาร์กัว & ยิมนัสติก</p>
+        </div>
+      </div>
+    </header>
+
+    <!-- ─── MAIN ─── -->
+    <main class="max-w-5xl mx-auto px-4 py-8 fade-in">
+      <!-- success banner (hidden by default) -->
+      <div
+        id="successBanner"
+        class="hidden mb-6 bg-green-50 border border-green-300 text-green-800 rounded-xl px-5 py-4 flex items-center gap-3"
+      >
+        <span class="text-2xl">✅</span>
+        <div>
+          <p class="font-semibold">ลงทะเบียนสำเร็จ!</p>
+          <p class="text-sm">
+            ข้อมูลของท่านถูกบันทึกลงใน Google Sheet เรียบร้อยแล้ว
+          </p>
+        </div>
+      </div>
+
+      <div class="grid md:grid-cols-2 gap-8">
+        <!-- ─── LEFT: CALENDAR ─── -->
+        <div class="glass rounded-2xl shadow-xl p-6">
+          <h2 class="text-brand font-bold text-lg mb-4 flex items-center gap-2">
+            <span class="text-2xl">📅</span> เลือกวันเรียน
+          </h2>
+          <p class="text-xs text-gray-500 mb-4">
+            * วันที่มี
+            <span
+              class="inline-block w-3 h-3 rounded-full bg-accent align-middle"
+            ></span>
+            คือมีการจองแล้ว
+          </p>
+
+          <!-- Month nav -->
+          <div class="flex items-center justify-between mb-4">
+            <button
+              id="prevMonth"
+              onclick="changeMonth(-1)"
+              class="w-8 h-8 rounded-full bg-brand-light text-brand font-bold text-lg hover:bg-brand hover:text-white transition"
+            >
+              ‹
+            </button>
+            <span id="monthLabel" class="font-semibold text-gray-700"></span>
+            <button
+              id="nextMonth"
+              onclick="changeMonth(1)"
+              class="w-8 h-8 rounded-full bg-brand-light text-brand font-bold text-lg hover:bg-brand hover:text-white transition"
+            >
+              ›
+            </button>
+          </div>
+
+          <!-- Day headers -->
+          <div class="grid grid-cols-7 mb-1">
+            <div class="text-center text-xs font-semibold text-red-400 py-1">
+              อา
+            </div>
+            <div class="text-center text-xs font-semibold text-gray-400 py-1">
+              จ
+            </div>
+            <div class="text-center text-xs font-semibold text-gray-400 py-1">
+              อ
+            </div>
+            <div class="text-center text-xs font-semibold text-gray-400 py-1">
+              พ
+            </div>
+            <div class="text-center text-xs font-semibold text-gray-400 py-1">
+              พฤ
+            </div>
+            <div class="text-center text-xs font-semibold text-gray-400 py-1">
+              ศ
+            </div>
+            <div class="text-center text-xs font-semibold text-blue-400 py-1">
+              ส
+            </div>
+          </div>
+
+          <!-- Calendar grid -->
+          <div class="relative">
+            <div id="calGrid" class="grid grid-cols-7 gap-1"></div>
+            <!-- Calendar loading overlay -->
+            <div id="calLoadingOverlay" class="loading-overlay hide">
+              <div class="spinner"></div>
+              <span class="text-xs text-brand font-medium"
+                >กำลังโหลดข้อมูลการจอง...</span
+              >
+            </div>
+          </div>
+
+          <!-- Selected date pill -->
+          <div id="selectedDatePill" class="hidden mt-4 text-center">
+            <span
+              class="inline-flex items-center gap-2 bg-brand text-white text-sm rounded-full px-4 py-1.5 font-medium shadow"
+            >
+              <span>📅</span> <span id="selectedDateText"></span>
+            </span>
+          </div>
+        </div>
+
+        <!-- ─── RIGHT: FORM ─── -->
+        <div class="glass rounded-2xl shadow-xl p-6">
+          <h2 class="text-brand font-bold text-lg mb-5 flex items-center gap-2">
+            <span class="text-2xl">📝</span> กรอกข้อมูลจอง
+          </h2>
+
+          <form id="bookingForm" onsubmit="submitForm(event)" class="space-y-4">
+            <!-- Dropdown loading bar -->
+            <div
+              id="dropdownLoadingBar"
+              class="hidden flex items-center gap-2 text-xs text-brand bg-brand-light rounded-xl px-4 py-2"
+            >
+              <div
+                class="spinner"
+                style="width: 16px; height: 16px; border-width: 2px"
+              ></div>
+              <span>กำลังโหลดข้อมูลจาก Google Sheet...</span>
+            </div>
+            <!-- คอร์ส skeleton -->
+            <div id="skeletonCourse" class="hidden">
+              <div class="skeleton w-full"></div>
+            </div>
+            <!-- สถานที่ skeleton -->
+            <div id="skeletonLocation" class="hidden">
+              <div class="skeleton w-full"></div>
+            </div>
+            <!-- วันที่เรียน (readonly — set by calendar) -->
+            <div>
+              <label class="block text-sm font-semibold text-gray-600 mb-1"
+                >วันที่เรียน <span class="text-red-400">*</span></label
+              >
+              <input
+                id="fieldDate"
+                name="date"
+                type="text"
+                readonly
+                placeholder="คลิกเลือกวันบนปฏิทิน →"
+                class="w-full border border-gray-200 rounded-xl px-4 py-2.5 bg-brand-light/50 text-brand font-semibold cursor-default text-sm"
+              />
+            </div>
+
+            <!-- คอร์สเรียน -->
+            <div>
+              <label class="block text-sm font-semibold text-gray-600 mb-1"
+                >คอร์สเรียน <span class="text-red-400">*</span></label
+              >
+              <div class="relative">
+                <select
+                  id="fieldCourse"
+                  name="course"
+                  required
+                  class="w-full appearance-none border border-gray-200 rounded-xl px-4 py-2.5 bg-white text-sm text-gray-700 focus:border-brand transition pr-10"
+                >
+                  <option value="" disabled selected>-- เลือกคอร์ส --</option>
+                  <!-- Loaded from Google Sheet (or default list below) -->
+                </select>
+                <div
+                  class="pointer-events-none absolute inset-y-0 right-3 flex items-center text-gray-400"
+                >
+                  ▾
+                </div>
+              </div>
+            </div>
+
+            <!-- สถานที่เรียน -->
+            <div>
+              <label class="block text-sm font-semibold text-gray-600 mb-1"
+                >สถานที่เรียน <span class="text-red-400">*</span></label
+              >
+              <div class="relative">
+                <select
+                  id="fieldLocation"
+                  name="location"
+                  required
+                  class="w-full appearance-none border border-gray-200 rounded-xl px-4 py-2.5 bg-white text-sm text-gray-700 focus:border-brand transition pr-10"
+                >
+                  <option value="" disabled selected>-- เลือกสถานที่ --</option>
+                </select>
+                <div
+                  class="pointer-events-none absolute inset-y-0 right-3 flex items-center text-gray-400"
+                >
+                  ▾
+                </div>
+              </div>
+            </div>
+
+            <!-- ชื่อผู้ปกครอง -->
+            <div>
+              <label class="block text-sm font-semibold text-gray-600 mb-1"
+                >ชื่อผู้ปกครอง <span class="text-red-400">*</span></label
+              >
+              <input
+                id="fieldParent"
+                name="parent"
+                type="text"
+                required
+                placeholder="กรอกชื่อผู้ปกครอง"
+                class="w-full border border-gray-200 rounded-xl px-4 py-2.5 bg-white text-sm text-gray-700 focus:border-brand transition"
+              />
+            </div>
+
+            <!-- ชื่อนักเรียน -->
+            <div>
+              <label class="block text-sm font-semibold text-gray-600 mb-1"
+                >ชื่อนักเรียน <span class="text-red-400">*</span></label
+              >
+              <input
+                id="fieldStudent"
+                name="student"
+                type="text"
+                required
+                placeholder="กรอกชื่อนักเรียน"
+                class="w-full border border-gray-200 rounded-xl px-4 py-2.5 bg-white text-sm text-gray-700 focus:border-brand transition"
+              />
+            </div>
+
+            <!-- อายุนักเรียน -->
+            <div>
+              <label class="block text-sm font-semibold text-gray-600 mb-1"
+                >อายุนักเรียน <span class="text-red-400">*</span></label
+              >
+              <input
+                id="fieldAge"
+                name="age"
+                type="number"
+                min="1"
+                max="25"
+                required
+                placeholder="อายุ (ปี)"
+                class="w-full border border-gray-200 rounded-xl px-4 py-2.5 bg-white text-sm text-gray-700 focus:border-brand transition"
+              />
+            </div>
+
+            <!-- Submit -->
+            <button
+              type="submit"
+              id="submitBtn"
+              class="w-full bg-brand hover:bg-brand-dark active:scale-95 text-white font-bold rounded-xl py-3 mt-2 transition text-base shadow-lg shadow-brand/30"
+            >
+              <span id="submitLabel">🚀 ลงทะเบียนจองคอร์ส</span>
+              <span id="submitSpinner" class="hidden">⏳ กำลังบันทึก...</span>
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <!-- ─── BOOKING SUMMARY TABLE ─── -->
+      <!-- <div class="mt-8 glass rounded-2xl shadow-xl p-6 overflow-x-auto">
+        <h2 class="text-brand font-bold text-lg mb-4 flex items-center gap-2">
+          <span class="text-2xl">📋</span> รายการจองที่ส่งไปแล้ว (session นี้)
+        </h2>
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="bg-brand-light text-brand">
+              <th class="px-3 py-2 rounded-l-lg text-left">#</th>
+              <th class="px-3 py-2 text-left">วันที่</th>
+              <th class="px-3 py-2 text-left">คอร์ส</th>
+              <th class="px-3 py-2 text-left">สถานที่</th>
+              <th class="px-3 py-2 text-left">ผู้ปกครอง</th>
+              <th class="px-3 py-2 text-left">นักเรียน</th>
+              <th class="px-3 py-2 text-left">อายุ</th>
+              <th class="px-3 py-2 rounded-r-lg text-left">ลบ</th>
+            </tr>
+          </thead>
+          <tbody id="summaryTable" class="divide-y divide-gray-100">
+            <tr id="emptyRow">
+              <td colspan="8" class="text-center text-gray-400 py-6">
+                ยังไม่มีรายการ
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div> -->
+    </main>
+
+    <!-- Toast -->
+    <div
+      id="toast"
+      class="toast hide rounded-xl shadow-2xl px-5 py-3 text-sm font-medium text-white max-w-xs"
+    ></div>
+
+    <!-- ─── CONFIRM MODAL ─── -->
+    <div
+      id="confirmModal"
+      class="fixed inset-0 z-50 flex items-center justify-center hidden"
+    >
+      <!-- Backdrop -->
+      <div
+        class="absolute inset-0 bg-black/40 backdrop-blur-sm"
+        onclick="closeConfirm()"
+      ></div>
+      <!-- Modal box -->
+      <div
+        class="relative glass rounded-2xl shadow-2xl p-6 w-full max-w-sm mx-4 fade-in"
+      >
+        <h3 class="text-brand font-bold text-lg mb-4 flex items-center gap-2">
+          <span class="text-2xl">📋</span> ยืนยันการจอง
+        </h3>
+        <div class="space-y-2 text-sm mb-5" id="confirmDetails"></div>
+        <div class="flex gap-3">
+          <button
+            onclick="closeConfirm()"
+            class="flex-1 border border-gray-200 rounded-xl py-2.5 font-semibold text-gray-500 hover:bg-gray-50 transition"
+          >
+            ยกเลิก
+          </button>
+          <button
+            onclick="confirmSubmit()"
+            class="flex-1 bg-brand hover:bg-brand-dark text-white font-bold rounded-xl py-2.5 transition shadow-lg shadow-brand/30"
+          >
+            ✅ ยืนยันจอง
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── SCRIPT ─── -->
+    <script>
+      // ══════════════════════════════════════════════════
+      //  ⚙️  CONFIGURATION — เปลี่ยนค่าตรงนี้
+      // ══════════════════════════════════════════════════
+      const APPS_SCRIPT_URL =
+        "https://script.google.com/macros/s/AKfycbxReDzQFDOr3NVhns5pFn31Fz7F0IxuqYzn9M8wHjojyIeje-9l4dT-GsZeGlU7bGqp/exec";
+      // ^ วาง URL ของ Google Apps Script Web App ที่นี่
+
+      // ── ข้อมูล dropdown (fallback เมื่อยังไม่ได้เชื่อม Google Sheet)
+      const DEFAULT_COURSES = ["ปาร์กัว", "ยิมนัสติก"];
+      const DEFAULT_LOCATIONS = ["ยิมวัดสะแก้"];
+      // ══════════════════════════════════════════════════
+
+      // สิ่งที่โหลดมาจาก Google Sheet (หรือ fallback)
+      let availableCourses = [...DEFAULT_COURSES];
+      let availableLocations = [...DEFAULT_LOCATIONS];
+
+      // ────────────── POPULATE DROPDOWNS ──────────────
+      function populateSelect(id, items) {
+        const sel = document.getElementById(id);
+        const first = sel.options[0];
+        sel.innerHTML = "";
+        sel.appendChild(first);
+        items.forEach((v) => {
+          const o = document.createElement("option");
+          o.value = v;
+          o.textContent = v;
+          sel.appendChild(o);
+        });
+      }
+
+      function initDropdowns() {
+        populateSelect("fieldCourse", availableCourses);
+        populateSelect("fieldLocation", availableLocations);
+      }
+
+      // ────────────── LOADING HELPERS ──────────────
+      function setCalendarLoading(on) {
+        const overlay = document.getElementById("calLoadingOverlay");
+        if (on) overlay.classList.remove("hide");
+        else overlay.classList.add("hide");
+      }
+
+      function setDropdownLoading(on) {
+        document
+          .getElementById("dropdownLoadingBar")
+          .classList.toggle("hidden", !on);
+        document
+          .getElementById("skeletonCourse")
+          .classList.toggle("hidden", !on);
+        document
+          .getElementById("skeletonLocation")
+          .classList.toggle("hidden", !on);
+        // hide/show actual selects
+        const course = document
+          .getElementById("fieldCourse")
+          .closest("div.relative");
+        const location = document
+          .getElementById("fieldLocation")
+          .closest("div.relative");
+        course.classList.toggle("hidden", on);
+        location.classList.toggle("hidden", on);
+      }
+
+      // ────────────── LOAD FROM GOOGLE SHEET ──────────────
+      // Calls the Apps Script GET endpoint for dropdown data
+      async function loadDropdownsFromSheet() {
+        setDropdownLoading(true);
+        if (!APPS_SCRIPT_URL.includes("YOUR_SCRIPT_ID")) {
+          try {
+            const res = await fetch(APPS_SCRIPT_URL + "?action=getDropdowns");
+            const data = await res.json();
+            if (data.courses && data.courses.length)
+              availableCourses = data.courses;
+            if (data.locations && data.locations.length)
+              availableLocations = data.locations;
+          } catch (e) {
+            console.warn("ไม่สามารถโหลด dropdown จาก Sheet:", e);
+          }
+        }
+        initDropdowns();
+        setDropdownLoading(false);
+      }
+
+      // ────────────── LOAD EXISTING BOOKINGS FROM SHEET ──────────────
+      async function loadBookingsFromSheet() {
+        if (APPS_SCRIPT_URL.includes("YOUR_SCRIPT_ID")) return;
+        setCalendarLoading(true);
+        try {
+          const res = await fetch(APPS_SCRIPT_URL + "?action=getBookings");
+          const data = await res.json();
+          if (data.bookingsByDate) {
+            Object.assign(bookingsByDate, data.bookingsByDate);
+            renderCalendar();
+          }
+        } catch (e) {
+          console.warn("ไม่สามารถโหลดข้อมูลการจองจาก Sheet:", e);
+        } finally {
+          setCalendarLoading(false);
+        }
+      }
+
+      // ────────────── CALENDAR ──────────────
+      const NOW = new Date();
+      let calYear = NOW.getFullYear();
+      let calMonth = NOW.getMonth(); // 0-indexed
+
+      const THAI_MONTHS = [
+        "มกราคม",
+        "กุมภาพันธ์",
+        "มีนาคม",
+        "เมษายน",
+        "พฤษภาคม",
+        "มิถุนายน",
+        "กรกฎาคม",
+        "สิงหาคม",
+        "กันยายน",
+        "ตุลาคม",
+        "พฤศจิกายน",
+        "ธันวาคม",
+      ];
+
+      let selectedDate = null;
+      let bookingsByDate = {}; // key: "YYYY-MM-DD", value: booking count
+
+      const THAI_DAYS = [
+        "อาทิตย์",
+        "จันทร์",
+        "อังคาร",
+        "พุธ",
+        "พฤหัสบดี",
+        "ศุกร์",
+        "เสาร์",
+      ];
+
+      function dateToKey(d) {
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+      }
+
+      function renderCalendar() {
+        const label = document.getElementById("monthLabel");
+        label.textContent = `${THAI_MONTHS[calMonth]} ${calYear + 543}`;
+
+        const grid = document.getElementById("calGrid");
+        grid.innerHTML = "";
+
+        const firstDay = new Date(calYear, calMonth, 1).getDay(); // 0=Sun
+        const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
+
+        // blank cells before first day
+        for (let i = 0; i < firstDay; i++) {
+          const blank = document.createElement("div");
+          grid.appendChild(blank);
+        }
+
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        for (let d = 1; d <= daysInMonth; d++) {
+          const date = new Date(calYear, calMonth, d);
+          const dow = date.getDay(); // 0=Sun, 6=Sat
+          const isWeekend = dow === 0 || dow === 6;
+          const isPast = date < today;
+          const isToday = date.getTime() === today.getTime();
+          const isSel =
+            selectedDate && date.getTime() === selectedDate.getTime();
+          const dateKey = dateToKey(date);
+          const count = bookingsByDate[dateKey] || 0;
+
+          const btn = document.createElement("button");
+          btn.type = "button";
+          btn.className = [
+            "day-btn w-full aspect-square rounded-lg text-xs font-medium transition flex flex-col items-center justify-center gap-0",
+            isWeekend ? "text-brand font-semibold" : "text-gray-700",
+            isToday ? "today-mark" : "",
+            isSel ? "selected" : "",
+          ].join(" ");
+
+          const numSpan = document.createElement("span");
+          numSpan.textContent = d;
+          btn.appendChild(numSpan);
+
+          if (count > 0) {
+            const badge = document.createElement("span");
+            badge.className = "booking-badge";
+            badge.textContent = count;
+            btn.appendChild(badge);
+          }
+
+          if (isPast) btn.disabled = true;
+
+          btn.addEventListener("click", () => selectDate(date));
+          grid.appendChild(btn);
+        }
+      }
+
+      function changeMonth(dir) {
+        calMonth += dir;
+        if (calMonth > 11) {
+          calMonth = 0;
+          calYear++;
+        }
+        if (calMonth < 0) {
+          calMonth = 11;
+          calYear--;
+        }
+        renderCalendar();
+      }
+
+      function selectDate(date) {
+        selectedDate = date;
+
+        // Fill hidden input
+        const fmt = formatDate(date);
+        document.getElementById("fieldDate").value = fmt;
+
+        // Update pill
+        document.getElementById("selectedDateText").textContent = fmt;
+        document.getElementById("selectedDatePill").classList.remove("hidden");
+
+        renderCalendar(); // re-render to highlight
+      }
+
+      function formatDate(d) {
+        const dd = String(d.getDate()).padStart(2, "0");
+        const mm = String(d.getMonth() + 1).padStart(2, "0");
+        const yyyy = d.getFullYear() + 543;
+        return `${dd}/${mm}/${yyyy}`;
+      }
+
+      // ────────────── FORM SUBMIT ──────────────
+      let bookingCount = 0;
+      let pendingPayload = null;
+
+      async function submitForm(e) {
+        e.preventDefault();
+
+        if (!selectedDate) {
+          showToast("⚠️ กรุณาเลือกวันเรียนจากปฏิทิน", "bg-yellow-500");
+          return;
+        }
+
+        pendingPayload = {
+          date: document.getElementById("fieldDate").value,
+          course: document.getElementById("fieldCourse").value,
+          day: THAI_DAYS[selectedDate.getDay()],
+          location: document.getElementById("fieldLocation").value,
+          parent: document.getElementById("fieldParent").value.trim(),
+          student: document.getElementById("fieldStudent").value.trim(),
+          age: document.getElementById("fieldAge").value,
+          timestamp: new Date().toLocaleString("th-TH"),
+          dateKey: dateToKey(selectedDate),
+        };
+
+        // Show confirmation modal
+        document.getElementById("confirmDetails").innerHTML = `
+          <div class="flex justify-between border-b border-gray-100 pb-1"><span class="text-gray-500">วันที่เรียน</span><span class="font-semibold text-brand">${pendingPayload.date}</span></div>
+          <div class="flex justify-between border-b border-gray-100 pb-1"><span class="text-gray-500">วันเรียน</span><span class="font-semibold">${pendingPayload.day}</span></div>
+          <div class="flex justify-between border-b border-gray-100 pb-1"><span class="text-gray-500">คอร์ส</span><span class="font-semibold">${pendingPayload.course}</span></div>
+          <div class="flex justify-between border-b border-gray-100 pb-1"><span class="text-gray-500">สถานที่</span><span class="font-semibold">${pendingPayload.location}</span></div>
+          <div class="flex justify-between border-b border-gray-100 pb-1"><span class="text-gray-500">ผู้ปกครอง</span><span class="font-semibold">${pendingPayload.parent}</span></div>
+          <div class="flex justify-between border-b border-gray-100 pb-1"><span class="text-gray-500">นักเรียน</span><span class="font-semibold">${pendingPayload.student}</span></div>
+          <div class="flex justify-between"><span class="text-gray-500">อายุ</span><span class="font-semibold">${pendingPayload.age} ปี</span></div>
+        `;
+        document.getElementById("confirmModal").classList.remove("hidden");
+      }
+
+      function closeConfirm() {
+        document.getElementById("confirmModal").classList.add("hidden");
+        pendingPayload = null;
+      }
+
+      async function confirmSubmit() {
+        document.getElementById("confirmModal").classList.add("hidden");
+        const payload = pendingPayload;
+        pendingPayload = null;
+
+        // UI loading
+        document.getElementById("submitLabel").classList.add("hidden");
+        document.getElementById("submitSpinner").classList.remove("hidden");
+        document.getElementById("submitBtn").disabled = true;
+
+        try {
+          if (!APPS_SCRIPT_URL.includes("YOUR_SCRIPT_ID")) {
+            await fetch(APPS_SCRIPT_URL, {
+              method: "POST",
+              mode: "no-cors",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ ...payload, action: "addBooking" }),
+            });
+          }
+
+          // Show success
+          document.getElementById("successBanner").classList.remove("hidden");
+          document
+            .getElementById("successBanner")
+            .scrollIntoView({ behavior: "smooth" });
+          showToast("✅ จองคอร์สสำเร็จ!", "bg-green-600");
+
+          // Add to local summary table
+          bookingCount++;
+          addSummaryRow(bookingCount, payload);
+
+          // Track booking count per date for calendar badges
+          bookingsByDate[payload.dateKey] =
+            (bookingsByDate[payload.dateKey] || 0) + 1;
+
+          // Reset form
+          document.getElementById("bookingForm").reset();
+          selectedDate = null;
+          document.getElementById("selectedDatePill").classList.add("hidden");
+          renderCalendar();
+
+          setTimeout(
+            () =>
+              document.getElementById("successBanner").classList.add("hidden"),
+            6000,
+          );
+        } catch (err) {
+          showToast("❌ เกิดข้อผิดพลาด กรุณาลองใหม่", "bg-red-500");
+          console.error(err);
+        } finally {
+          document.getElementById("submitLabel").classList.remove("hidden");
+          document.getElementById("submitSpinner").classList.add("hidden");
+          document.getElementById("submitBtn").disabled = false;
+        }
+      }
+
+      function addSummaryRow(n, p) {
+        const tbody = document.getElementById("summaryTable");
+        if (!tbody) return; // table is hidden/commented out
+        const empty = document.getElementById("emptyRow");
+        if (empty) empty.remove();
+        const rowId = "row-" + n;
+        const tr = document.createElement("tr");
+        tr.id = rowId;
+        tr.className = "hover:bg-brand-light/40 transition";
+        tr.innerHTML = `
+          <td class="px-3 py-2 text-gray-400">${n}</td>
+          <td class="px-3 py-2 font-medium text-brand">${p.date}</td>
+          <td class="px-3 py-2">${p.course}</td>
+          <td class="px-3 py-2">${p.location}</td>
+          <td class="px-3 py-2">${p.parent}</td>
+          <td class="px-3 py-2">${p.student}</td>
+          <td class="px-3 py-2">${p.age} ปี</td>
+          <td class="px-3 py-2">
+            <button onclick="deleteRow('${rowId}','${p.dateKey}')" class="text-red-400 hover:text-red-600 text-xs font-bold transition px-1" title="ลบรายการ">✕</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      }
+
+      function deleteRow(rowId, key) {
+        const tr = document.getElementById(rowId);
+        if (tr) tr.remove();
+        if (key && bookingsByDate[key]) {
+          bookingsByDate[key] = Math.max(0, bookingsByDate[key] - 1);
+          if (bookingsByDate[key] === 0) delete bookingsByDate[key];
+        }
+        renderCalendar();
+        const tbody = document.getElementById("summaryTable");
+        if (!tbody) return;
+        if (tbody.children.length === 0) {
+          const empty = document.createElement("tr");
+          empty.id = "emptyRow";
+          empty.innerHTML =
+            '<td colspan="8" class="text-center text-gray-400 py-6">ยังไม่มีรายการ</td>';
+          tbody.appendChild(empty);
+        }
+      }
+
+      // ────────────── TOAST ──────────────
+      function showToast(msg, colorClass) {
+        const t = document.getElementById("toast");
+        t.textContent = msg;
+        t.className = `toast rounded-xl shadow-2xl px-5 py-3 text-sm font-medium text-white max-w-xs ${colorClass}`;
+        t.classList.remove("hide");
+        setTimeout(() => t.classList.add("hide"), 3500);
+      }
+
+      // ────────────── INIT ──────────────
+      renderCalendar();
+      loadDropdownsFromSheet();
+      loadBookingsFromSheet();
+    </script>
+  </body>
+</html>
